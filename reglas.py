@@ -188,26 +188,26 @@ def cobertura(entr,atributos,clase):
 
     
     
-def calcula_frecuencia_relativa(entr,atributos,clase, R):
+def calcula_frecuencia_relativa(entr,atributos,clase, regla_aprendida):
     res = []
     
     for i,(atr,valores) in enumerate(atributos):
         
-        if len(R)==0 : #si no hay nada en la regla aprendida
+        if len(regla_aprendida)==0 : #si no hay nada en la regla aprendida
             
             for valor in valores: #recorremos los valores
                 #calculamos la freq relativa con todos los ejemplos y enviamos el numero de ejemplos que cumplen la regla y no la clase
                 res.append((i,valor,sum([1 for entrada in entr if clase in entrada and valor in entrada])
                 /sum([1 for entrada in entr if valor in entrada]), sum([1 for entrada in entr if valor in entrada])))
                 
-        elif not any([i == atomo[0] for atomo in R]) : # si no, no tenemos en cuenta los atributos que ya estan en R
+        elif not any([i == atomo[0] for atomo in regla_aprendida]) : # si no, no tenemos en cuenta los atributos que ya estan en R
             entr_actualizado = []
 
             for ejemplo in entr:
                 
-                if all([atomo[1] == ejemplo[atomo[0]] for atomo in R ]):
+                if all([atomo[1] == ejemplo[atomo[0]] for atomo in regla_aprendida]):
                     entr_actualizado.append(ejemplo) #actualizamos los ejemplos para contar menos
-            
+            print(entr_actualizado)
             for valor in valores:
                 res.append((i,valor,sum([1 for entrada in entr_actualizado if clase in entrada and valor in entrada 
                                          ])/sum([1 for entrada in entr_actualizado if valor in entrada]), sum([1 for entrada in entr if valor in entrada])))
@@ -395,11 +395,50 @@ def elimina_ejemplos(ejemplos,reglas,clase):
 #   define como la proporción de ejemplos que se clasifican correctamente. 
 
 def reglas_decision_cobertura(entr,atributos,clases):
-    pass
+    res=[]
+    clases_ordenadas = ordena_clases(entr,clases)
+    
+    for clase in clases_ordenadas:
+        resAux=[clase]
+       
+        if clase == clases_ordenadas[-1]:
+           resAux.append([])
+           res.append(resAux)
+        else:
+            resAux.append(cobertura(entr,atributos,clase))
+            res.append(resAux)
+            
+                 
+    return res 
+    
+
+def ordena_clases(entr,clases):
+    res = {}
+    for clase in clases:
+        res[clase] = 0;
+    for ejemplo in entr:
+        for clase in clases:
+            if ejemplo[-1] == clase:   
+                res[clase]=res[clase]+1;
+    res = sorted(res,key=lambda x : x[1])
+    return res
+
 
 
 def imprime_RD(reglas_decision,atributos,atributo_clasificacion):
-    pass
+    for clasificacion in reglas_decision: #Recorremos cada posible valor de clasificacion
+        clasificador = clasificacion[0] #Guardamos el valor de clasificacion
+        for regla in clasificacion[1]: #Recorremos todas las reglas para esa clasificacion
+            if not regla: #Si la regla no tiene contenido suponemos que es la última
+                print("* En caso contrario, [" + atributo_clasificacion + " = " + clasificador + "]")
+            else:
+                print("* Si ",end="")
+                for atomo in regla: #Recorremos cada atomo de la regla
+                    print( "(" + atributos[atomo[0]][0] + " = " + atomo[1] + ")" ,end="")
+                    if atomo != regla[-1]: #Mientras el atomo no sea el ultimo de la regla estamos imprimiendo la y
+                        print(" y ",end="")
+                
+                print(" Entonces [" + atributo_clasificacion + " = " + clasificador + "]")
 
 
 def clasifica_RD(ej,reglas_decision):
