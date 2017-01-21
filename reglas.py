@@ -164,53 +164,55 @@ def cobertura(entr,atributos,clase):
     
     while clase in sum(e,[]): #aplanamos e para comprobar
         R=[]
-        
-        while len(R) != len(atributos): #paramos si no hay  más atributos por usar
-            freq = calcula_frecuencia_relativa(e,atributos,clase, R)   #calculamos la freq relativa
+        entr_actualizado=e.copy()
+        while len(R) != len(atributos) or not entr_actualizado: #paramos si no hay más atributos o ejemplos por usar 
+            freq = calcula_frecuencia_relativa(entr_actualizado,atributos,clase, R)   #calculamos la freq relativa
             maximo = max(freq,key=lambda k : k[2]) #obtenemos el maximo de freq relativa
-                
-            if maximo[2] == 1.0: #paramos si el máximo es uno
-                unos = [ f for f in freq if f[2]==1.0] # guardamos todos los máximos 1.0
+            
+            if maximo[2] == 1.0: #paramos si la frecuencia relativa máxima es uno
+                unos = [ f for f in freq if f[2]==1.0] # guardamos todos aquellos que tengan freq rel. = 1.0
 
-                if len(unos) > 1: #si hay más de un máximo 1.0
+                if len(unos) > 1: 
                     maximo=max( unos ,key=lambda k : k[3]) #obtenemos el átomo máximo recubridor
-                
-                R.append(maximo[:2]) #añadimos la tupla en la forma que la devolveremos
+
+                R.append(maximo[:2]) #añadimos la tupla con formato (*índice de atributo*, *valor de atributo*)
                 break
             
             else:
-                R.append(maximo[:2]) #añadimos la tupla en la forma que la devolveremos
-        
+
+                R.append(maximo[:2])  #añadimos la tupla con formato (*índice de atributo*, *valor de atributo*)
+
+            entr_actualizado = actualiza_entrenamiento(entr_actualizado, R) # nos quedamos con los ejemplos cubiertos incorrectamente
         reglas_aprendidas.append(R) #añadimos la regla aprendida
 
         e = elimina_ejemplos(e,reglas_aprendidas,clase) #eliminamos los ejemplos que ya cubiertos totalmente
+#        print(e)
+        
     return reglas_aprendidas
 
+def actualiza_entrenamiento(e, R):
+    return [ ejemplo for ejemplo in e if  all([atomo[1] == ejemplo[atomo[0]] for atomo in R ])]
     
-    
-def calcula_frecuencia_relativa(entr,atributos,clase, regla_aprendida):
+def calcula_frecuencia_relativa(entr,atributos,clase, R):
     res = []
-    
-    for i,(atr,valores) in enumerate(atributos):
-        
-        if len(regla_aprendida)==0 : #si no hay nada en la regla aprendida
-            
-            for valor in valores: #recorremos los valores
-                #calculamos la freq relativa con todos los ejemplos y enviamos el numero de ejemplos que cumplen la regla y no la clase
-                res.append((i,valor,sum([1 for entrada in entr if clase in entrada and valor in entrada])
-                /sum([1 for entrada in entr if valor in entrada]), sum([1 for entrada in entr if valor in entrada])))
-                
-        elif not any([i == atomo[0] for atomo in regla_aprendida]) : # si no, no tenemos en cuenta los atributos que ya estan en R
-            entr_actualizado = []
 
-            for ejemplo in entr:
+    # eliminamos aquellos atributos que ya han sido usados para aprender una regla
+    atributos_no_aprendidos = [ (i,(atr,valores)) for i,(atr,valores) in enumerate(atributos) if not any([i == atomo[0] for atomo in R]) ] 
+
+    for i,(atr,valores) in atributos_no_aprendidos:
+ 
+        for valor in valores:
+            
+            
+            cubiertos = len([1 for entrada in entr if valor in entrada]) # número de ejemplos cubiertos por el valor del atributo
+            
+            if(cubiertos != 0):
                 
-                if all([atomo[1] == ejemplo[atomo[0]] for atomo in regla_aprendida]):
-                    entr_actualizado.append(ejemplo) #actualizamos los ejemplos para contar menos
-            print(entr_actualizado)
-            for valor in valores:
-                res.append((i,valor,sum([1 for entrada in entr_actualizado if clase in entrada and valor in entrada 
-                                         ])/sum([1 for entrada in entr_actualizado if valor in entrada]), sum([1 for entrada in entr if valor in entrada])))
+                cubiertos_correctamente = len([1 for entrada in entr if clase in entrada and valor in entrada ]) # número de ejemplos cubiertos correctamente por el valor del atributo
+                res.append((i,valor,cubiertos_correctamente/cubiertos, cubiertos))
+                
+            else:
+                res.append((i,valor,0, 0 ) )
     
     return res
     
@@ -227,7 +229,6 @@ def elimina_ejemplos(ejemplos,reglas,clase):
             
     return res
         
-                    
     
 # Ejemplos:
 # ---------
@@ -394,35 +395,36 @@ def elimina_ejemplos(ejemplos,reglas,clase):
 #   ejemplos de los que ya se conoce su valor de clasificación. El rendimiento se
 #   define como la proporción de ejemplos que se clasifican correctamente. 
 
+
+
 def reglas_decision_cobertura(entr,atributos,clases):
     res=[]
-    clases_ordenadas = ordena_clases(entr,clases)
+    clases_ordenadas = ordena_clases(entr,clases)#ordenamos las clases de menor a mayor valor de coincidencia en ejemplos
     
-    for clase in clases_ordenadas:
-        resAux=[clase]
+    for clase in clases_ordenadas:#recorremos las clases
+        resAux=[clase]#guardamos la clase que clasificamos en este momento
        
-        if clase == clases_ordenadas[-1]:
-           resAux.append([])
-           res.append(resAux)
+        if clase == clases_ordenadas[-1]:#si ya es la ultima clase
+            resAux.append([[]])#guardamos vacío
+        
         else:
-            resAux.append(cobertura(entr,atributos,clase))
-            res.append(resAux)
+            resAux.append(cobertura(entr,atributos,clase))#Llamamos a cobertura para cada clase
             
+        res.append(resAux)#guardamos aux en el resultado
+        resAux=[]#la ponemos a vacío
                  
     return res 
     
 
 def ordena_clases(entr,clases):
-    res = {}
-    for clase in clases:
-        res[clase] = 0;
-    for ejemplo in entr:
-        for clase in clases:
-            if ejemplo[-1] == clase:   
-                res[clase]=res[clase]+1;
-    res = sorted(res,key=lambda x : x[1])
+    res = dict()#inicializamos el diccionario
+    for clase in clases:#recorremos las clases
+        res[clase] = 0#iniciamos el diccionario a cero
+        for ejemplo in entr:#recorremos los ejemplos
+            if ejemplo[-1] == clase:#Si el ejemplo clasifica con esa clase
+                res[clase]=res[clase]+1#sumamos uno a esa clase (contamos)
+    res = sorted(res,key=lambda x : res[x])#ordenamos por los valores (apariciones en los ejemplos) y devolvemos una lista
     return res
-
 
 
 def imprime_RD(reglas_decision,atributos,atributo_clasificacion):
@@ -442,11 +444,16 @@ def imprime_RD(reglas_decision,atributos,atributo_clasificacion):
 
 
 def clasifica_RD(ej,reglas_decision):
-    pass
+    for regla in reglas_decision:
+        if any([ all([ ej[atributo] == valor for atributo,valor in atomo ]) for atomo in regla[1]]):
+            #si alguna regla cumple todos los atomos devolvemos la clasificacion
+            return regla[0]
 
 
 def rendimiento_RD(reglas_decision,ejemplos):
-    pass
+    # por cada ejemplo, comparamos la clasificacion obtenida por clasifica_RD con la del ejemplo, sumamos y dividimos entre el numero total de ejemplos
+    return sum([ejemplo[-1] == clasifica_RD(ejemplo[:-1], reglas_decision) for ejemplo in ejemplos])/len(ejemplos)
+
 
 
 # Ejemplos:
@@ -857,6 +864,33 @@ def rendimiento(clasificador,ejemplos):
 #   seguido de una aplicación del algoritmo de pospoda. Cobertura se aplica
 #   con el conjunto de entrenamiento y la poda con el conjunto de validación.
 
+class ClasificadorCobertura(MetodoClasificacion):
+
+    def __init__(self, atributo_clasificacion,clases,atributos):
+
+        self.atributo_clasificacion=atributo_clasificacion
+        self.clases = clases
+        self.atributos=atributos
+        self.reglas_decision=[]#Añadimos donde guardar la clasificacion
+     
+    def entrena(self,entr,valid=None):
+       
+        self.reglas_decision=reglas_decision_cobertura(entr,self.atributos,self.clases)
+
+    def clasifica(self, ejemplo):
+       
+        if not self.reglas_decision:
+            raise ClasificadorNoEntrenado
+        else: 
+            return clasifica_RD(ejemplo,self.reglas_decision)
+         
+
+    def imprime_clasificador(self):
+        
+        if not self.reglas_decision:
+            raise ClasificadorNoEntrenado
+        else: 
+            return imprime_RD(self.reglas_decision,self.atributos,self.atributo_clasificacion)
 
 
 # Ejemplos:
